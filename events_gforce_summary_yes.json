@@ -1,0 +1,114 @@
+[
+    {
+        "eventId": 5672563,
+        "eventType": "SmartShock",
+        "gsensor_file_location": "D:\\scripts\\downloads_gsensor_yes\\event_5672563_fa2a52e3-2d82-455d-8ff3-dbdb28f453da.gsdata",
+        "video_urls": [
+            "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620176683/2026/08/23/MP4/3973dac6-9142-4c23-904f-35c9dedd1e84.1.mp4"
+        ],
+        "imei": "357048620176683",
+        "deviceId": "DVC1450",
+        "media": [
+            {
+                "URL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620176683/2026/08/23/MP4/3973dac6-9142-4c23-904f-35c9dedd1e84.1.mp4",
+                "Speed": 61,
+                "Camera": 1,
+                "MDTURL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620176683/2026/08/23/MDT/0a4cbec1-d277-4d40-b784-0b9f3292722c.0.mdt",
+                "Heading": 281,
+                "Altitude": 2146,
+                "Latitude": 39.34173,
+                "Longitude": -120.32119,
+                "FileFormat": 3,
+                "ContentSize": 2495223,
+                "EndDateTime": "2026-08-23T11:46:40.0000000Z",
+                "StartDateTime": "2026-08-23T11:46:20.0000000Z",
+                "full_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620176683/2026/08/23/MP4/3973dac6-9142-4c23-904f-35c9dedd1e84.1.mp4",
+                "full_mdt_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620176683/2026/08/23/MDT/0a4cbec1-d277-4d40-b784-0b9f3292722c.0.mdt"
+            }
+        ]
+    },
+    {
+        "eventId": 3813702,
+        "eventType": "SmartShock",
+        "gsensor_file_location": "D:\\scripts\\downloads_gsensor_yes\\event_3813702_da880469-2471-45c2-ae44-d1251e636076.gsdata",
+        "video_urls": [
+            "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620250207/2026/07/29/MP4/393f709f-b124-4a27-8dfb-91e5081c7670.1.mp4"
+        ],
+        "imei": "357048620250207",
+        "deviceId": "DEV00940",
+        "media": [
+            {
+                "URL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620250207/2026/07/29/MP4/393f709f-b124-4a27-8dfb-91e5081c7670.1.mp4",
+                "Speed": 92,
+                "Camera": 1,
+                "MDTURL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620250207/2026/07/29/MDT/47fe2d75-224f-4152-8ea3-d7a4926a7245.0.mdt",
+                "Heading": 50,
+                "Altitude": 1580,
+                "Latitude": 39.43968,
+                "Longitude": -120.01925,
+                "FileFormat": 3,
+                "ContentSize": 2449195,
+                "EndDateTime": "2026-07-29T13:21:51.0000000Z",
+                "StartDateTime": "2026-07-29T13:21:31.0000000Z",
+                "full_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620250207/2026/07/29/MP4/393f709f-b124-4a27-8dfb-91e5081c7670.1.mp4",
+                "full_mdt_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620250207/2026/07/29/MDT/47fe2d75-224f-4152-8ea3-d7a4926a7245.0.mdt"
+            }
+        ]
+    },
+    {
+        "eventId": 5170893,
+        "eventType": "SmartShock",
+        "gsensor_file_location": "D:\\scripts\\downloads_gsensor_yes\\event_5170893_a5a557b5-40cc-4b47-8281-ca957c13036d.gsdata",
+        "video_urls": [
+            "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620480325/2026/08/15/MP4/ec572f7b-c1b4-428d-b8a8-f50601ee5d4d.1.mp4"
+        ],
+        "imei": "357048620480325",
+        "deviceId": "DEV100078",
+        "media": [
+            {
+                "URL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620480325/2026/08/15/MP4/ec572f7b-c1b4-428d-b8a8-f50601ee5d4d.1.mp4",
+                "Speed": 120,
+                "Camera": 1,
+                "MDTURL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620480325/2026/08/15/MDT/801559b1-c755-4b1d-83c6-6ad4fec3c9c8.0.mdt",
+                "Heading": 80,
+                "Altitude": 1346,
+                "Latitude": 32.24933,
+                "Longitude": -107.93022,
+                "FileFormat": 3,
+                "ContentSize": 2469107,
+                "EndDateTime": "2026-08-15T08:47:32.0000000Z",
+                "StartDateTime": "2026-08-15T08:47:12.0000000Z",
+                "full_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620480325/2026/08/15/MP4/ec572f7b-c1b4-428d-b8a8-f50601ee5d4d.1.mp4",
+                "full_mdt_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/357048620480325/2026/08/15/MDT/801559b1-c755-4b1d-83c6-6ad4fec3c9c8.0.mdt"
+            }
+        ]
+    },
+    {
+        "eventId": 6784424,
+        "eventType": "SmartShock",
+        "imei": "016124006556609",
+        "deviceId": "DVC1217",
+        "gsensor_file_location": "D:\\FNOL analysis system\\downloads_gsensor_yes\\event_6784424_8d545a38-c570-4377-9dc4-a3b9bf62b800.gsdata",
+        "video_urls": [
+            "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/016124006556609/2026/09/08/MP4/77413ddf-2615-4bac-9c36-a7e03e524aa7.1.mp4"
+        ],
+        "media": [
+            {
+                "URL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/016124006556609/2026/09/08/MP4/77413ddf-2615-4bac-9c36-a7e03e524aa7.1.mp4",
+                "Speed": 100,
+                "Camera": 1,
+                "MDTURL": "/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/016124006556609/2026/09/08/MDT/9997e5c4-06d0-4b8f-8dfc-3fc1b1e8a70a.0.mdt",
+                "Heading": 98,
+                "Altitude": 200,
+                "Latitude": 33.88075,
+                "Longitude": -117.57466,
+                "FileFormat": 3,
+                "ContentSize": 2446027,
+                "EndDateTime": "2026-09-08T21:15:52.0000000Z",
+                "StartDateTime": "2026-09-08T21:15:32.0000000Z",
+                "full_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/016124006556609/2026/09/08/MP4/77413ddf-2615-4bac-9c36-a7e03e524aa7.1.mp4",
+                "full_mdt_url": "https://sv.smartwitness.co/SmartWitness/RecorderService/GetDataFile/9f6de850-cc79-40f4-9fee-ffc630ec61b7/016124006556609/2026/09/08/MDT/9997e5c4-06d0-4b8f-8dfc-3fc1b1e8a70a.0.mdt"
+            }
+        ]
+    }
+]
