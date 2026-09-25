@@ -9,6 +9,8 @@ import statistics
 import requests
 from datetime import datetime, timezone
 
+from auth import auth, authed_get
+
 LIVETRACK_API_BASE = "https://kinetic-api.dronaaim.ai/fleet/trip/livetrack"
 
 RECORD_SIZE = 14  # 8 bytes timestamp (uint64) + 3 * 2 bytes int16 (x, y, z in milli-g)
@@ -848,16 +850,58 @@ def _build_events_index(download_dir, summary_file):
     return events_index
 
 
+# Built index per dataset, keyed by a fingerprint of the files it was built from.
+_INDEX_CACHE = {}
+
+
+def _dataset_fingerprint(download_dir, summary_file):
+    """Cheap change-detector for one dataset.
+
+    sync_server.py rewrites the summary JSON and drops new .gsdata files while
+    this dashboard is running, so the index can no longer be built once at
+    startup - but re-globbing and re-parsing a multi-megabyte JSON on every
+    request would be wasteful. The summary file's (mtime, size) plus the .gsdata
+    file count is enough to notice a poll that actually added something.
+    """
+    try:
+        stat = os.stat(summary_file)
+        summary_sig = (stat.st_mtime_ns, stat.st_size)
+    except OSError:
+        summary_sig = None
+
+    try:
+        file_count = sum(
+            1 for name in os.listdir(download_dir) if name.endswith(".gsdata")
+        )
+    except OSError:
+        file_count = 0
+
+    return (summary_sig, file_count)
+
+
+def get_events_index(key):
+    """Returns a dataset's index, rebuilding it only when its files have changed."""
+    cfg = DATASETS[key]
+    fingerprint = _dataset_fingerprint(cfg["download_dir"], cfg["summary_file"])
+    cached = _INDEX_CACHE.get(key)
+    if cached is not None and cached[0] == fingerprint:
+        return cached[1]
+
+    events_index = _build_events_index(cfg["download_dir"], cfg["summary_file"])
+    _INDEX_CACHE[key] = (fingerprint, events_index)
+    return events_index
+
+
 def run_dashboard_server(port=8080):
     """Starts a local HTTP server providing an interactive telemetry dashboard."""
     import http.server
     import urllib.parse
     import webbrowser
 
-    dataset_indices = {
-        key: _build_events_index(cfg["download_dir"], cfg["summary_file"])
-        for key, cfg in DATASETS.items()
-    }
+    # Warm the cache once up front; every later request re-checks the files and
+    # rebuilds only if sync_server.py changed them.
+    for key in DATASETS:
+        get_events_index(key)
 
     def dataset_key(query):
         key = query.get("dataset", ["no_crash"])[0]
@@ -875,12 +919,12 @@ def run_dashboard_server(port=8080):
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
-                self.wfile.write(json.dumps(dataset_indices[key]).encode("utf-8"))
+                self.wfile.write(json.dumps(get_events_index(key)).encode("utf-8"))
                 return
 
             if path == "/api/data":
                 key = dataset_key(query)
-                events_index = dataset_indices[key]
+                events_index = get_events_index(key)
                 download_dir = DATASETS[key]["download_dir"]
 
                 target_file = None
@@ -925,10 +969,12 @@ def run_dashboard_server(port=8080):
 
                 # Proxied server-side (rather than fetched directly from the
                 # browser) so this works regardless of the external API's own
-                # CORS policy, and so it's called with the same requests/retry
-                # setup as the rest of this project's API access.
+                # CORS policy, so it's called with the same requests/retry setup
+                # as the rest of this project's API access - and so the Cognito
+                # token stays on the server instead of being handed to the page.
                 try:
-                    resp = requests.get(
+                    resp = authed_get(
+                        requests,
                         f"{LIVETRACK_API_BASE}/{device_id}",
                         params={"fromDate": from_ms, "toDate": to_ms},
                         timeout=20,
@@ -961,8 +1007,13 @@ def run_dashboard_server(port=8080):
     print(f"\n========================================================")
     print(f"  G-Sensor Telemetry Dashboard is running!")
     print(f"  URL: {url}")
-    print(f"  No Crash (decision=no):  {len(dataset_indices['no_crash'])} sensor files in {DATASETS['no_crash']['download_dir']}/")
-    print(f"  Crash (decision=yes):    {len(dataset_indices['crash'])} sensor files in {DATASETS['crash']['download_dir']}/")
+    print(f"  No Crash (decision=no):  {len(get_events_index('no_crash'))} sensor files in {DATASETS['no_crash']['download_dir']}/")
+    print(f"  Crash (decision=yes):    {len(get_events_index('crash'))} sensor files in {DATASETS['crash']['download_dir']}/")
+    print(f"  Live updates: run 'python sync_server.py' alongside this to poll the API every 10s.")
+    auth_state = auth.status()
+    print(
+        f"  Auth: {'enabled (flow=' + auth_state['flow'] + ')' if auth_state['enabled'] else 'disabled - GPS calls go out unauthenticated'}"
+    )
     print(f"  Press Ctrl+C in terminal to stop.")
     print(f"========================================================\n")
     try:
@@ -1078,16 +1129,45 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             background-color: #1e3a8a;
             border-left: 4px solid var(--accent-blue);
         }
+        /* Unread, mail-client style: new/updated events from the background
+           sync get a steady tint (not a blink) that persists until the event
+           is opened - see markEventAsRead(), called from loadEvent(). They're
+           also pinned to the top of the list (see sortEvents()) for as long as
+           they stay unread, so nothing new needs to be hunted for by scrolling. */
+        .event-item.is-new {
+            background-color: rgba(16, 185, 129, 0.16);
+            border-left: 3px solid var(--accent-green);
+        }
+        .event-item.is-new:hover {
+            background-color: rgba(16, 185, 129, 0.24);
+        }
+        .event-item.is-new .event-title {
+            font-weight: 700;
+        }
         .event-title {
             font-weight: 600;
             font-size: 14px;
             display: flex;
             justify-content: space-between;
         }
+        /* Position in the current sort/filter (1..N) - lets "N events found"
+           in the header be checked directly against what's actually rendered. */
+        .event-index {
+            font-weight: 400;
+            font-size: 11px;
+            color: var(--text-muted);
+            font-family: monospace;
+        }
         .event-sub {
             font-size: 12px;
             color: var(--text-muted);
             margin-top: 4px;
+        }
+        .event-timestamp {
+            font-size: 11px;
+            color: var(--text-muted);
+            margin-top: 2px;
+            opacity: 0.75;
         }
         .group-header {
             display: flex;
@@ -1510,9 +1590,16 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             </div>
             <div id="fileCount" style="font-size: 12px; color: var(--text-muted)">Loading events...</div>
             <input type="text" id="searchBox" class="search-box" placeholder="Search Event ID, Type, or IMEI..." oninput="filterEvents()">
-            <label class="switch" style="margin-top: 8px;">
-                <input type="checkbox" id="groupByImeiCheckbox" onchange="toggleGroupByImei(this)">
-                Group by IMEI</label>
+            <div class="header-row" style="margin-top: 8px; margin-bottom: 0;">
+                <label class="switch"><input type="checkbox" id="groupByImeiCheckbox" onchange="toggleGroupByImei(this)">
+                    Group by IMEI</label>
+                <label style="font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 6px;">
+                    Sort:
+                    <select id="sortSelect" class="dataset-select" onchange="setSortBy(this.value)">
+                        <option value="time_desc">Time (Newest)</option>
+                    </select>
+                </label>
+            </div>
         </div>
         <ul id="eventsList"></ul>
     </div>
@@ -1657,6 +1744,56 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
     <script>
         let allEvents = [];
+        // Mail-client style "unread" tracking: every event_id that has arrived
+        // or been updated via the background sync since it was last opened.
+        // Accumulates across ticks (so several arrivals all stay marked, not
+        // just the latest one) and is cleared one event at a time - by
+        // markEventAsRead(), from loadEvent() - never on a timer.
+        let unreadEventIds = new Set();
+
+        // Only one option today (time, newest first); more (severity, speed, ...)
+        // can be added to the #sortSelect dropdown and this switch later without
+        // touching how sorting is applied.
+        let currentSort = 'time_desc';
+
+        function setSortBy(value) {
+            currentSort = value;
+            allEvents = sortEvents(allEvents);
+            filterEvents();
+        }
+
+        // Applies the chosen sort, then always pins unread events to the very
+        // top (in the order they arrived) regardless of that sort - so nothing
+        // unread ever needs to be hunted for by scrolling. An event drops out
+        // of the pin the moment it's opened (see markEventAsRead()).
+        function sortEvents(events) {
+            const sorted = [...events].sort((a, b) => {
+                if (currentSort === 'time_desc') {
+                    const at = a.event_time_ms ?? -Infinity;
+                    const bt = b.event_time_ms ?? -Infinity;
+                    if (at !== bt) return bt - at;
+                }
+                // Tie-break (and the only rule if event_time_ms is missing on both):
+                // numeric event ID, newest/highest first.
+                return (Number(b.event_id) || 0) - (Number(a.event_id) || 0);
+            });
+            if (unreadEventIds.size === 0) return sorted;
+            const isUnread = (ev) => unreadEventIds.has(ev.event_id);
+            return [...sorted.filter(isUnread), ...sorted.filter(ev => !isUnread(ev))];
+        }
+
+        // Called when an event is opened (loadEvent) - the "read" action. Drops
+        // the highlight in place immediately, without a full list re-render, so
+        // the list doesn't reorder/jump out from under the click; the next
+        // natural re-render (search, sort, or the next background refresh)
+        // reflects the event's normal (unpinned) sort position for good.
+        function markEventAsRead(ev) {
+            if (!unreadEventIds.has(ev.event_id)) return;
+            unreadEventIds.delete(ev.event_id);
+            document
+                .querySelectorAll(`.event-item[data-event-id="${CSS.escape(String(ev.event_id))}"]`)
+                .forEach(el => el.classList.remove('is-new'));
+        }
         let currentEvent = null;
         let currentDataset = 'no_crash';   // 'no_crash' = decision=no, 'crash' = decision=yes
         let currentData = null;
@@ -1956,12 +2093,36 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             }
         }
 
-        async function loadEventsList() {
+        // `silent` is the 10s background refresh: it must never yank the event
+        // the user is currently reviewing, so it only touches the list, and only
+        // when sync_server.py actually added something.
+        async function loadEventsList({ silent = false } = {}) {
             try {
                 const res = await fetch(`/api/events?dataset=${currentDataset}`);
-                allEvents = await res.json();
-                document.getElementById('fileCount').textContent =
-                    allEvents.length > 0 ? `${allEvents.length} events found` : 'No events found';
+                const events = await res.json();
+
+                if (silent) {
+                    const previousIds = new Set(allEvents.map(ev => ev.event_id));
+                    const added = events.filter(ev => !previousIds.has(ev.event_id));
+                    if (added.length === 0) return;
+
+                    // Accumulate rather than replace: an event arriving this tick
+                    // shouldn't un-mark one still unread from a previous tick.
+                    // Set before sorting - sortEvents() pins whatever is in
+                    // unreadEventIds to the top regardless of the chosen sort.
+                    added.forEach(ev => unreadEventIds.add(ev.event_id));
+                    allEvents = sortEvents(events);
+                    updateFileCount(added.length);
+                    filterEvents();   // re-renders honouring the search box, highlights the new ones
+
+                    // Nothing selected yet (empty dataset on first load): the
+                    // first event to arrive can safely open itself.
+                    if (!currentEvent && allEvents.length > 0) loadEvent(allEvents[0]);
+                    return;
+                }
+
+                allEvents = sortEvents(events);
+                updateFileCount(0);
                 renderEventsList(allEvents);
                 if (allEvents.length > 0) {
                     loadEvent(allEvents[0]);
@@ -1971,6 +2132,14 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             } catch (e) {
                 console.error('Failed to load events:', e);
             }
+        }
+
+        function updateFileCount(added) {
+            const el = document.getElementById('fileCount');
+            const base = allEvents.length > 0 ? `${allEvents.length} events found` : 'No events found';
+            el.innerHTML = added > 0
+                ? `${base} <span style="color: var(--accent-green)">&middot; +${added} new</span>`
+                : base;
         }
 
         // Resets the main panel when switching datasets to an empty list, or before
@@ -2010,12 +2179,19 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             currentDataset = value;
             document.getElementById('searchBox').value = '';
             document.getElementById('fileCount').textContent = 'Loading events...';
+            unreadEventIds = new Set();   // event IDs don't carry across datasets
+            allEvents = [];
             clearEventView();
             loadEventsList();
         }
 
+        // Matches sync_server.py's poll interval: the server refreshes the JSONs
+        // every 10s, the dashboard picks the new events up on the same cadence.
+        const REFRESH_INTERVAL_MS = 10000;
+
         async function init() {
             await loadEventsList();
+            setInterval(() => loadEventsList({ silent: true }), REFRESH_INTERVAL_MS);
         }
 
         // Keyboard: space toggles play, [ and ] step the speed, arrows nudge one frame.
@@ -2051,18 +2227,44 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             renderEventsList(lastRenderedEvents);
         }
 
+        // Position of each event in the current sort order (1-based), computed
+        // once per render from the full list before it gets grouped/sliced - so
+        // the number stays a stable "1..N of the full list" reference whether
+        // you're looking at the flat view or a single IMEI group, letting you
+        // cross-check the rendered count against the "N events found" header.
+        let eventIndexById = new Map();
+
+        // event_time_ms is the midpoint of the first media clip's Start/EndDateTime
+        // (see _build_events_index in view_gsensor.py) - null only for an event
+        // whose media hasn't been enriched yet (see is_fully_enriched / the
+        // sync's enrich pass, which exists specifically to close that gap).
+        function formatEventTimestamp(ev) {
+            if (!ev.event_time_ms) return null;
+            const d = new Date(ev.event_time_ms);
+            return d.toLocaleString(undefined, {
+                year: 'numeric', month: 'short', day: 'numeric',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+            });
+        }
+
         function buildEventItem(ev) {
             const li = document.createElement('li');
-            li.className = 'event-item' + (currentEvent && currentEvent.filename === ev.filename ? ' active' : '');
+            li.dataset.eventId = ev.event_id;   // lets markEventAsRead() find this row directly
+            li.className = 'event-item'
+                + (currentEvent && currentEvent.filename === ev.filename ? ' active' : '')
+                + (unreadEventIds.has(ev.event_id) ? ' is-new' : '');
             const subtitle = ev.imei
                 ? `IMEI: ${ev.imei}${ev.device_id ? ' &middot; ' + ev.device_id : ''}`
                 : `${ev.filename.substring(0, 32)}...`;
+            const index = eventIndexById.get(ev.event_id);
+            const timestamp = formatEventTimestamp(ev);
             li.innerHTML = `
                 <div class="event-title">
-                    <span>Event #${ev.event_id}</span>
+                    <span><span class="event-index">${index != null ? '#' + index : ''}</span> Event #${ev.event_id}</span>
                     <span style="color: var(--accent-yellow)">${ev.event_type}</span>
                 </div>
                 <div class="event-sub">${subtitle}</div>
+                <div class="event-timestamp">${timestamp || 'Timestamp pending (media still syncing)'}</div>
             `;
             li.onclick = () => loadEvent(ev);
             return li;
@@ -2073,8 +2275,17 @@ DASHBOARD_HTML = """<!DOCTYPE html>
             const listEl = document.getElementById('eventsList');
             listEl.innerHTML = '';
 
+            // 1-based position in this exact list, fixed before grouping/slicing
+            // touches it - the number shown in the UI, so "N events found" above
+            // and the highest #N row in the list are directly comparable.
+            eventIndexById = new Map(events.map((ev, i) => [ev.event_id, i + 1]));
+
             if (!groupByImei) {
-                events.slice(0, 200).forEach((ev) => listEl.appendChild(buildEventItem(ev)));
+                // Previously capped at the first 200 - silently hid the rest of
+                // the list while the header above still (correctly) reported the
+                // full count. Every event in the current sort/filter is rendered
+                // now; the browser handles a few thousand simple <li> rows fine.
+                events.forEach((ev) => listEl.appendChild(buildEventItem(ev)));
                 return;
             }
 
@@ -2270,7 +2481,11 @@ DASHBOARD_HTML = """<!DOCTYPE html>
 
         async function loadEvent(ev) {
             currentEvent = ev;
+            markEventAsRead(ev);   // opening an event is the "read" action - clears its unread highlight
             document.querySelectorAll('.event-item').forEach(el => el.classList.remove('active'));
+            document
+                .querySelectorAll(`.event-item[data-event-id="${CSS.escape(String(ev.event_id))}"]`)
+                .forEach(el => el.classList.add('active'));
             document.getElementById('selectedTitle').textContent = `Event #${ev.event_id} (${ev.event_type})`;
             document.getElementById('selectedMeta').textContent = ev.imei
                 ? `File: ${ev.filename}  ·  IMEI: ${ev.imei}${ev.device_id ? '  ·  Device: ' + ev.device_id : ''}`

@@ -1,0 +1,16 @@
+# Credentials - never commit. .env.example carries the (empty) template instead.
+.env
+.env.*
+!.env.example
+
+# Live poller output - regenerated every 10s, no value in history.
+livetrack_latest.json
+
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Atomic-write temporaries, if a write is ever interrupted.
+*.tmp
+*.part
